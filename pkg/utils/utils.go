@@ -1,12 +1,45 @@
 package utils
 
 import (
+	json2 "encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
+
+type TimestampModel struct {
+	Timestamp int64
+}
+
+type ServerAddress struct {
+	Identifier *string `json:"identifier"`
+	LocalKey   string  `json:"localKey"`
+	Location   string  `json:"location"`
+}
+
+type ServerIdentifier struct {
+	Identifier *string `json:"identifier"`
+}
+
+type ServerInformation struct {
+	Identifier *string `json:"identifier"`
+	LocalKey *string `json:"localKey"`
+
+}
+
+var SeededRand = rand.New(
+	rand.NewSource(time.Now().UnixNano()))
+
+const charset = "abcdefghijklmnopqrstuvwxyz" +
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+var ServerData = ServerInformation{}
 
 func GetIpAddress(r *http.Request) (string, error) {
 	//Get IP from the X-REAL-IP header
@@ -44,4 +77,73 @@ func TimeToMilliseconds(t time.Time) int64 {
 
 func RemoveString(values []string, index int ) []string {
 	return append(values[:index], values[index+1:]...)
+}
+
+func GetServerIp() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
+}
+
+func GetTimeStamp() int64{
+	return TimeToMilliseconds(time.Now().Round(time.Millisecond))
+}
+
+func RandomString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[SeededRand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+func (si ServerInformation) ReadServerInformation(){
+	if _, err := os.Stat(DataDirectory); os.IsNotExist(err) {
+		err := os.MkdirAll(DataDirectory, os.ModePerm)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	jsonFile, err := os.OpenFile(DataFile, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	json2.Unmarshal(byteValue, &ServerData)
+}
+
+func (si ServerInformation) SaveServerInformation(){
+	if _, err := os.Stat(DataDirectory); os.IsNotExist(err) {
+		err := os.MkdirAll(DataDirectory, os.ModePerm)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	jsonFile, err := os.OpenFile(DataFile, os.O_WRONLY | os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer jsonFile.Close()
+
+	byteValue, err := json2.Marshal(ServerData)
+
+	if err != nil {
+		log.Println(err)
+	}
+	_, err = jsonFile.Write(byteValue)
+
+
+	if err != nil {
+		log.Println(err)
+	}
 }

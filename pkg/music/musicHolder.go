@@ -1,13 +1,14 @@
 package music
 
 import (
+	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/faiface/beep"
+	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 	"log"
 	"math"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,16 +31,22 @@ type PlayingSong struct {
 }
 
 type SongDescription struct {
-	Timestamp               int64
-	Name                    string
-	SongCurrentMilliseconds int64
-	SongMaxMilliseconds     int64
+	Timestamp               int64  `json:"timestamp"`
+	Name                    string `json:"name"`
+	SongCurrentMilliseconds int  `json:"songCurrentMilliseconds"`
+	SongMaxMilliseconds     int  `json:"songMaxMilliseconds"`
+	SampleRate              int    `json:"sampleRate"`
 }
 
 type VotingSong struct {
-	SongId    int
-	SongName  string
-	SongVotes int
+	SongId    int    `json:"songId"`
+	SongName  string `json:"songName"`
+	SongVotes int    `json:"songVotes"`
+}
+
+type NextSongStarted struct {
+	NextSong   SongDescription `json:"nextSong"`
+	VotingList []VotingSong    `json:"votingList"`
 }
 
 var AllSongs []Song
@@ -54,6 +61,8 @@ var SongVotes = make(map[Song][]string)
 var songDone = make(chan bool)
 
 var currentSong PlayingSong
+
+var NewSongStarted = make(chan NextSongStarted)
 
 func LoadMusicFiles() {
 	if _, err := os.Stat(utils.MusicDirectory); os.IsNotExist(err) {
@@ -88,7 +97,7 @@ func LoadMusicFiles() {
 			if len(tokens) > 2 {
 				song.Name = strings.Join(tokens[:len(tokens)-1], " ")
 				song.AudioFileType = tokens[len(tokens)-1]
-			}else {
+			} else {
 				song.Name = tokens[0]
 				song.AudioFileType = tokens[1]
 			}
@@ -103,9 +112,12 @@ func LoadMusicFiles() {
 	}
 }
 
-func prepareNextSet() {
+func prepareNextSet(lastSong Song) {
 	for i := 0; i < utils.NumberOfSongs; {
 		randSong := randomSong()
+		if randSong == lastSong {
+			continue
+		}
 		if _, ok := SongVotes[randSong]; ok {
 			continue
 		}
@@ -115,11 +127,11 @@ func prepareNextSet() {
 }
 
 func randomSong() Song {
-	rand.Seed(time.Now().UnixNano())
-	return AllSongs[rand.Intn(len(AllSongs)-1)]
+	return AllSongs[utils.SeededRand.Intn(len(AllSongs)-1)]
 }
 
 func StartNextSong() {
+	lastSong := currentSong
 	var nextSong Song
 	maxVotes := math.MinInt8
 	if len(SongVotes) == 0 {
@@ -133,8 +145,8 @@ func StartNextSong() {
 		}
 	}
 	SongVotes = make(map[Song][]string)
+	prepareNextSet(lastSong.SongDetails)
 	go PlaySong(nextSong)
-	prepareNextSet()
 }
 
 func PlaySong(song Song) {
@@ -155,13 +167,34 @@ func PlaySong(song Song) {
 	ctrl := &beep.Ctrl{Paused: false, Streamer: beep.Seq(audioStream, beep.Callback(func() {
 		songDone <- true
 	}))}
-
-	currentSong = PlayingSong{AudioStream: audioStream, AudioFormat: audioFormat, AudioControl: ctrl, SongDetails: song}
-	speaker.Play(ctrl)
-	playNext := <-songDone
-	if playNext {
-		StartNextSong()
+	volume := &effects.Volume{
+		Streamer: ctrl,
+		Base:     2,
+		Volume:   0,
+		Silent:   true,
 	}
+	currentSong = PlayingSong{AudioStream: audioStream, AudioFormat: audioFormat, AudioControl: ctrl, SongDetails: song}
+	speaker.Play(volume)
+	NewSongStarted <- NextSongStarted{
+		NextSong:   GetSongData(),
+		VotingList: GetVotingList(),
+	}
+	for {
+		select {
+		case <-songDone:
+			speaker.Close()
+			StartNextSong()
+			return
+		case <-time.After(time.Second):
+			speaker.Lock()
+			fmt.Println(audioFormat.SampleRate.D(audioStream.Position()).Round(time.Second))
+			speaker.Unlock()
+		}
+	}
+	//if <-songDone {
+	//	speaker.Close()
+	//	StartNextSong()
+	//}
 }
 
 func StartPauseMusic() {
@@ -177,15 +210,20 @@ func GetSongData() SongDescription {
 	songDescription := SongDescription{}
 	songDescription.Name = currentSong.SongDetails.Name
 	speaker.Lock()
-	songDescription.SongCurrentMilliseconds = currentSong.AudioFormat.SampleRate.D(currentSong.AudioStream.Position()).Milliseconds()
-	songDescription.SongMaxMilliseconds = currentSong.AudioFormat.SampleRate.D(currentSong.AudioStream.Len()).Milliseconds()
-	songDescription.Timestamp = utils.TimeToMilliseconds(time.Now().Round(time.Millisecond))
+	//songDescription.SampleRate = int(currentSong.AudioFormat.SampleRate)
+	//songDescription.SongCurrentMilliseconds = currentSong.AudioFormat.SampleRate.D(currentSong.AudioStream.Position()).Milliseconds()
+	//songDescription.SongMaxMilliseconds = currentSong.AudioFormat.SampleRate.D(currentSong.AudioStream.Len()).Milliseconds()
+	//songDescription.Timestamp = utils.GetTimeStamp()
+	songDescription.SampleRate = int(currentSong.AudioFormat.SampleRate)
+	songDescription.SongCurrentMilliseconds = currentSong.AudioStream.Position()
+	songDescription.SongMaxMilliseconds = currentSong.AudioStream.Len()
+	songDescription.Timestamp = utils.GetTimeStamp()
 	speaker.Unlock()
 	return songDescription
 }
 
 func NextSong() {
-	speaker.Clear()
+	speaker.Close()
 	songDone <- true
 }
 

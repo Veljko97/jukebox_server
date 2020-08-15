@@ -32,7 +32,13 @@ func removeConnection(index int){
 	delete(addressConnection, userAddress)
 }
 
-func CreateConnection(w http.ResponseWriter, r *http.Request) {
+func InitWebSocket(){
+
+	utils.Router.HandleFunc("/ws/music", createConnection)
+	go nextSongSending()
+}
+
+func createConnection(w http.ResponseWriter, r *http.Request) {
 	userAddress, _ := utils.GetIpAddress(r)
 	if _, ok := addressConnection[userAddress]; ok{
 		return
@@ -77,5 +83,12 @@ func PingAll(){
 			music.RemoveVote(conn.IpAddress)
 			conn.Conn.Close()
 		}
+	}
+}
+
+func nextSongSending(){
+	for {
+		songDescription := <- music.NewSongStarted
+		SendObjectToAll(songDescription)
 	}
 }

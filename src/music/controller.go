@@ -11,12 +11,13 @@ import (
 )
 
 func AddRoutes(){
-	utils.Router.HandleFunc("/api/play", PlayMusic)
-	utils.Router.HandleFunc("/api/getDetails", SongDetails)
-	utils.Router.HandleFunc("/api/nextSong", NextSong)
-	utils.Router.HandleFunc("/api/getSongList", GetSongsList)
-	utils.Router.HandleFunc("/api/voteOnSong/{id}", VoteOnSong)
-	utils.Router.HandleFunc("/api/getCurrentSong", GetCurrentSong)
+	prefix := "/api/music"
+	utils.Router.HandleFunc(prefix + "/play", PlayMusic)
+	utils.Router.HandleFunc(prefix + "/getDetails", SongDetails)
+	utils.Router.HandleFunc(prefix + "/nextSong", NextSong)
+	utils.Router.HandleFunc(prefix + "/getSongList", GetSongsList)
+	utils.Router.HandleFunc(prefix + "/voteOnSong/{id}", VoteOnSong)
+	utils.Router.HandleFunc(prefix + "/getCurrentSong", GetCurrentSong)
 }
 
 
@@ -53,7 +54,7 @@ func VoteOnSong(w http.ResponseWriter, r *http.Request) {
 	songId, _ := strconv.Atoi(songKey)
 	userAddress, _ := utils.GetIpAddress(r)
 	songVotes := music.VoteOnSong(userAddress, songId)
-	websocket.SendObjectToAll(songVotes)
+	websocket.SendObjectToAll(music.NextSongStarted{VotingList: songVotes})
 	json, _ := json2.Marshal(songVotes)
 	_, _ = w.Write(json)
 }
