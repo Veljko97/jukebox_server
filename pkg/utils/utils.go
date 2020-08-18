@@ -33,8 +33,7 @@ type ServerInformation struct {
 
 }
 
-var SeededRand = rand.New(
-	rand.NewSource(time.Now().UnixNano()))
+//var SeededRand =
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -98,7 +97,7 @@ func GetTimeStamp() int64{
 func RandomString(length int) string {
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = charset[SeededRand.Intn(len(charset))]
+		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(b)
 }

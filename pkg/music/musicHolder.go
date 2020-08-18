@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/faiface/beep"
-	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,53 +16,24 @@ import (
 	"time"
 )
 
-type Song struct {
-	id            int
-	Location      string
-	Name          string
-	AudioFileType string
-}
 
-type PlayingSong struct {
-	SongDetails  Song
-	AudioStream  beep.StreamSeekCloser
-	AudioFormat  beep.Format
-	AudioControl *beep.Ctrl
-}
+var AllSongs []*Song
 
-type SongDescription struct {
-	Timestamp               int64  `json:"timestamp"`
-	Name                    string `json:"name"`
-	SongCurrentMilliseconds int  `json:"songCurrentMilliseconds"`
-	SongMaxMilliseconds     int  `json:"songMaxMilliseconds"`
-	SampleRate              int    `json:"sampleRate"`
-}
-
-type VotingSong struct {
-	SongId    int    `json:"songId"`
-	SongName  string `json:"songName"`
-	SongVotes int    `json:"songVotes"`
-}
-
-type NextSongStarted struct {
-	NextSong   SongDescription `json:"nextSong"`
-	VotingList []VotingSong    `json:"votingList"`
-}
-
-var AllSongs []Song
-
-var TempSong []Song
-
-var SongPicks [utils.NumberOfSongs]Song
+var TempSong []*Song
 
 var songVotesLock sync.Mutex
-var SongVotes = make(map[Song][]string)
+var SongVotes = make(map[*Song][]string)
 
 var songDone = make(chan bool)
 
 var currentSong PlayingSong
 
 var NewSongStarted = make(chan NextSongStarted)
+
+var songIdMux = sync.Mutex{}
+var LastSongId = 0
+
+var NewSongChan = make(chan NewSongAdded)
 
 func LoadMusicFiles() {
 	if _, err := os.Stat(utils.MusicDirectory); os.IsNotExist(err) {
@@ -85,14 +56,14 @@ func LoadMusicFiles() {
 			log.Println(err)
 		}
 	}
-	id := 0
+	LastSongId = 0
 	err := filepath.Walk(utils.MusicDirectory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			id++
-			song := Song{id: id, Location: path}
+			LastSongId++
+			song := Song{id: LastSongId, Location: path}
 			tokens := strings.Split(info.Name(), ".")
 			if len(tokens) > 2 {
 				song.Name = strings.Join(tokens[:len(tokens)-1], " ")
@@ -101,7 +72,7 @@ func LoadMusicFiles() {
 				song.Name = tokens[0]
 				song.AudioFileType = tokens[1]
 			}
-			AllSongs = append(AllSongs, song)
+			AllSongs = append(AllSongs, &song)
 
 		}
 
@@ -110,13 +81,31 @@ func LoadMusicFiles() {
 	if err != nil {
 		log.Println(err)
 	}
+	go waitForNewSong()
 }
 
-func prepareNextSet(lastSong Song) {
+func waitForNewSong(){
+	for {
+		newSong := <- NewSongChan
+		if newSong.Err != nil {
+			fmt.Println(newSong.Err)
+			continue
+		}
+		songIdMux.Lock()
+		LastSongId ++
+		newSong.Song.id = LastSongId
+		AllSongs = append(AllSongs, newSong.Song)
+		songIdMux.Unlock()
+	}
+}
+
+func prepareNextSet(lastSong *Song) {
 	for i := 0; i < utils.NumberOfSongs; {
 		randSong := randomSong()
-		if randSong == lastSong {
-			continue
+		if lastSong != nil {
+			if randSong.id == lastSong.id {
+				continue
+			}
 		}
 		if _, ok := SongVotes[randSong]; ok {
 			continue
@@ -126,13 +115,12 @@ func prepareNextSet(lastSong Song) {
 	}
 }
 
-func randomSong() Song {
-	return AllSongs[utils.SeededRand.Intn(len(AllSongs)-1)]
+func randomSong() *Song {
+	return AllSongs[rand.Intn(len(AllSongs))]
 }
 
 func StartNextSong() {
-	lastSong := currentSong
-	var nextSong Song
+	var nextSong *Song
 	maxVotes := math.MinInt8
 	if len(SongVotes) == 0 {
 		nextSong = randomSong()
@@ -144,12 +132,12 @@ func StartNextSong() {
 			}
 		}
 	}
-	SongVotes = make(map[Song][]string)
-	prepareNextSet(lastSong.SongDetails)
+	SongVotes = make(map[*Song][]string)
+	prepareNextSet(nextSong)
 	go PlaySong(nextSong)
 }
 
-func PlaySong(song Song) {
+func PlaySong(song *Song) {
 	f, err := os.Open(song.Location)
 	if err != nil {
 		log.Fatal(err)
@@ -158,7 +146,8 @@ func PlaySong(song Song) {
 	defer f.Close()
 	audioStream, audioFormat, err := mp3.Decode(f)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println(err)
+		return
 	}
 	defer audioStream.Close()
 
@@ -167,14 +156,14 @@ func PlaySong(song Song) {
 	ctrl := &beep.Ctrl{Paused: false, Streamer: beep.Seq(audioStream, beep.Callback(func() {
 		songDone <- true
 	}))}
-	volume := &effects.Volume{
-		Streamer: ctrl,
-		Base:     2,
-		Volume:   0,
-		Silent:   true,
-	}
+	//volume := &effects.Volume{
+	//	Streamer: ctrl,
+	//	Base:     2,
+	//	Volume:   0,
+	//	Silent:   true,
+	//}
 	currentSong = PlayingSong{AudioStream: audioStream, AudioFormat: audioFormat, AudioControl: ctrl, SongDetails: song}
-	speaker.Play(volume)
+	speaker.Play(ctrl)
 	NewSongStarted <- NextSongStarted{
 		NextSong:   GetSongData(),
 		VotingList: GetVotingList(),
@@ -208,6 +197,7 @@ func StartPauseMusic() {
 
 func GetSongData() SongDescription {
 	songDescription := SongDescription{}
+	songDescription.SongId = currentSong.SongDetails.id
 	songDescription.Name = currentSong.SongDetails.Name
 	speaker.Lock()
 	//songDescription.SampleRate = int(currentSong.AudioFormat.SampleRate)

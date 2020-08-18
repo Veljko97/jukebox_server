@@ -11,7 +11,9 @@ import (
 	"github.com/Veljko97/jukebox_server/pkg/websocket"
 	musicController "github.com/Veljko97/jukebox_server/src/music"
 	"log"
+	"math/rand"
 	"net/http"
+	"time"
 )
 
 func getServerTime(w http.ResponseWriter, r *http.Request){
@@ -77,6 +79,7 @@ func handleRequests() {
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	music.LoadMusicFiles()
 	music.StartNextSong()
 	handleRequests()

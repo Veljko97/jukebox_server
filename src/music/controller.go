@@ -2,10 +2,12 @@ package music
 
 import (
 	json2 "encoding/json"
+	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/music"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/Veljko97/jukebox_server/pkg/websocket"
 	"github.com/gorilla/mux"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 )
@@ -18,6 +20,7 @@ func AddRoutes(){
 	utils.Router.HandleFunc(prefix + "/getSongList", GetSongsList)
 	utils.Router.HandleFunc(prefix + "/voteOnSong/{id}", VoteOnSong)
 	utils.Router.HandleFunc(prefix + "/getCurrentSong", GetCurrentSong)
+	utils.Router.HandleFunc(prefix + "/youTubeDownload", DownloadFromYouTube)
 }
 
 
@@ -62,5 +65,25 @@ func VoteOnSong(w http.ResponseWriter, r *http.Request) {
 func GetCurrentSong(w http.ResponseWriter, r *http.Request) {
 	song := music.GetSongData()
 	json, _ := json2.Marshal(song)
+	w.Write(json)
+}
+
+func DownloadFromYouTube(w http.ResponseWriter, r *http.Request) {
+	bytes, _ := ioutil.ReadAll(r.Body)
+	songUrl := string(bytes)
+
+	newSongChan := make(chan music.NewSongAdded)
+
+	go music.DownloadYoutubeSong(songUrl, newSongChan)
+
+	newSong := <- newSongChan
+	if newSong.Err != nil {
+		fmt.Println(newSong.Err)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(""))
+		return
+	}
+
+	json, _ := json2.Marshal(newSong.Song)
 	w.Write(json)
 }

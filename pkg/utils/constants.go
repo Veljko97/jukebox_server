@@ -1,8 +1,11 @@
 package utils
 
-import "os"
+import (
+	"os"
+	"runtime"
+)
 
-const NumberOfSongs = 5
+const NumberOfSongs = 1
 
 const MusicDirectory = "." + string(os.PathSeparator) + "local_jukebox_music"
 const MainMusicDir = string(os.PathSeparator) + "main"
@@ -17,3 +20,10 @@ const RecordServerAddress = "http://localhost:5001/local-jubox/us-central1/addSe
 const LocalKeyLength = 6
 
 const JsonContentType = "application/json"
+
+const Mp3Extension = "mp3"
+const Mp4Extension = "mp4"
+
+const FFmpegRoot = "." + string(os.PathSeparator) + "FFmpeg" + string(os.PathSeparator) + runtime.GOOS
+const FFmpegBin = FFmpegRoot + string(os.PathSeparator) + "ffmpeg"
+const FFprobeBin = FFmpegRoot + string(os.PathSeparator) + "ffprobe"
