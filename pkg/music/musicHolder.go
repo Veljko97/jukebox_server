@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/faiface/beep"
+	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 	"log"
@@ -29,6 +30,7 @@ var songDone = make(chan bool)
 var currentSong PlayingSong
 
 var NewSongStarted = make(chan NextSongStarted)
+var NewSongStartedLocal = make(chan NextSongStarted)
 
 var songIdMux = sync.Mutex{}
 var LastSongId = 0
@@ -156,18 +158,20 @@ func PlaySong(song *Song) {
 	ctrl := &beep.Ctrl{Paused: false, Streamer: beep.Seq(audioStream, beep.Callback(func() {
 		songDone <- true
 	}))}
-	//volume := &effects.Volume{
-	//	Streamer: ctrl,
-	//	Base:     2,
-	//	Volume:   0,
-	//	Silent:   true,
-	//}
+	volume := &effects.Volume{
+		Streamer: ctrl,
+		Base:     2,
+		Volume:   0,
+		Silent:   true,
+	}
 	currentSong = PlayingSong{AudioStream: audioStream, AudioFormat: audioFormat, AudioControl: ctrl, SongDetails: song}
-	speaker.Play(ctrl)
-	NewSongStarted <- NextSongStarted{
+	speaker.Play(volume)
+	newSong := NextSongStarted{
 		NextSong:   GetSongData(),
 		VotingList: GetVotingList(),
 	}
+	NewSongStarted <- newSong
+	NewSongStartedLocal <- newSong
 	for {
 		select {
 		case <-songDone:
@@ -205,8 +209,8 @@ func GetSongData() SongDescription {
 	//songDescription.SongMaxMilliseconds = currentSong.AudioFormat.SampleRate.D(currentSong.AudioStream.Len()).Milliseconds()
 	//songDescription.Timestamp = utils.GetTimeStamp()
 	songDescription.SampleRate = int(currentSong.AudioFormat.SampleRate)
-	songDescription.SongCurrentMilliseconds = currentSong.AudioStream.Position()
-	songDescription.SongMaxMilliseconds = currentSong.AudioStream.Len()
+	songDescription.SongCurrentSample = currentSong.AudioStream.Position()
+	songDescription.SongMaxSample = currentSong.AudioStream.Len()
 	songDescription.Timestamp = utils.GetTimeStamp()
 	speaker.Unlock()
 	return songDescription

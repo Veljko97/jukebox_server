@@ -5,6 +5,9 @@ import (
 	"runtime"
 )
 
+const LocalHost = "localhost"
+const ServerPort = ":8080"
+
 const NumberOfSongs = 1
 
 const MusicDirectory = "." + string(os.PathSeparator) + "local_jukebox_music"

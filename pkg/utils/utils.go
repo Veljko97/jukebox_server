@@ -28,9 +28,9 @@ type ServerIdentifier struct {
 }
 
 type ServerInformation struct {
-	Identifier *string `json:"identifier"`
-	LocalKey *string `json:"localKey"`
-
+	Identifier    *string `json:"identifier"`
+	LocalKey      *string `json:"localKey"`
+	ServerAddress *string `json:"serverAddress"`
 }
 
 //var SeededRand =
@@ -74,7 +74,7 @@ func TimeToMilliseconds(t time.Time) int64 {
 	return t.UnixNano() / int64(time.Millisecond)
 }
 
-func RemoveString(values []string, index int ) []string {
+func RemoveString(values []string, index int) []string {
 	return append(values[:index], values[index+1:]...)
 }
 
@@ -90,7 +90,7 @@ func GetServerIp() net.IP {
 	return localAddr.IP
 }
 
-func GetTimeStamp() int64{
+func GetTimeStamp() int64 {
 	return TimeToMilliseconds(time.Now().Round(time.Millisecond))
 }
 
@@ -102,7 +102,7 @@ func RandomString(length int) string {
 	return string(b)
 }
 
-func (si ServerInformation) ReadServerInformation(){
+func (si ServerInformation) ReadServerInformation() {
 	if _, err := os.Stat(DataDirectory); os.IsNotExist(err) {
 		err := os.MkdirAll(DataDirectory, os.ModePerm)
 		if err != nil {
@@ -121,14 +121,14 @@ func (si ServerInformation) ReadServerInformation(){
 	json2.Unmarshal(byteValue, &ServerData)
 }
 
-func (si ServerInformation) SaveServerInformation(){
+func (si ServerInformation) SaveServerInformation() {
 	if _, err := os.Stat(DataDirectory); os.IsNotExist(err) {
 		err := os.MkdirAll(DataDirectory, os.ModePerm)
 		if err != nil {
 			log.Println(err)
 		}
 	}
-	jsonFile, err := os.OpenFile(DataFile, os.O_WRONLY | os.O_CREATE, 0666)
+	jsonFile, err := os.OpenFile(DataFile, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -140,7 +140,6 @@ func (si ServerInformation) SaveServerInformation(){
 		log.Println(err)
 	}
 	_, err = jsonFile.Write(byteValue)
-
 
 	if err != nil {
 		log.Println(err)

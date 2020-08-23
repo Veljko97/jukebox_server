@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func getServerTime(w http.ResponseWriter, r *http.Request){
+func getServerTime(w http.ResponseWriter, r *http.Request) {
 	timestamp := utils.TimestampModel{
 		Timestamp: utils.GetTimeStamp(),
 	}
@@ -27,12 +27,13 @@ func getServerTime(w http.ResponseWriter, r *http.Request){
 func sendNewIpAddress() {
 	ipAddress := utils.GetServerIp()
 	fmt.Println(ipAddress)
+	addressString := ipAddress.String()
 	for {
 		localKey := utils.RandomString(utils.LocalKeyLength)
 		serverAddress := utils.ServerAddress{
 			Identifier: nil,
 			LocalKey:   localKey,
-			Location:   ipAddress.String(),
+			Location:   addressString,
 		}
 		body, _ := json2.Marshal(serverAddress)
 		resp, _ := http.Post(utils.RecordServerAddress, utils.JsonContentType, bytes.NewBuffer(body))
@@ -42,25 +43,29 @@ func sendNewIpAddress() {
 			decoder.Decode(&identifier)
 			utils.ServerData.Identifier = identifier.Identifier
 			utils.ServerData.LocalKey = &localKey
+			utils.ServerData.ServerAddress = &addressString
 			utils.ServerData.SaveServerInformation()
 			return
 		}
 	}
 }
 
-func updateServerData(){
+func updateServerData() {
 	ipAddress := utils.GetServerIp()
 	fmt.Println(ipAddress)
+	addressString := ipAddress.String()
 	serverAddress := utils.ServerAddress{
 		Identifier: utils.ServerData.Identifier,
 		LocalKey:   *utils.ServerData.LocalKey,
-		Location:   ipAddress.String(),
+		Location:   addressString,
 	}
+	utils.ServerData.ServerAddress = &addressString
+	go utils.ServerData.SaveServerInformation()
 	body, _ := json2.Marshal(serverAddress)
 	http.Post(utils.RecordServerAddress, utils.JsonContentType, bytes.NewBuffer(body))
 }
 
-func initServerData(){
+func initServerData() {
 	utils.ServerData.ReadServerInformation()
 	if utils.ServerData.Identifier != nil {
 		updateServerData()
@@ -73,9 +78,12 @@ func handleRequests() {
 	initServerData()
 	utils.Router.HandleFunc("/api/getServerTime", getServerTime)
 	utils.Router.Use(middlewares.Recovery)
+	utils.Router.Use(middlewares.HostCheck)
 	websocket.InitWebSocket()
 	musicController.AddRoutes()
-	log.Fatal(http.ListenAndServe(":8080", utils.Router))
+	log.Fatal(http.ListenAndServe(utils.ServerPort, utils.Router))
+
+
 }
 
 func main() {

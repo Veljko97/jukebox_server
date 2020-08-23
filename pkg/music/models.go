@@ -17,12 +17,12 @@ type PlayingSong struct {
 }
 
 type SongDescription struct {
-	SongId                  int    `json:"songId"`
-	Timestamp               int64  `json:"timestamp"`
-	Name                    string `json:"name"`
-	SongCurrentMilliseconds int    `json:"songCurrentMilliseconds"`
-	SongMaxMilliseconds     int    `json:"songMaxMilliseconds"`
-	SampleRate              int    `json:"sampleRate"`
+	SongId            int    `json:"songId"`
+	Timestamp         int64  `json:"timestamp"`
+	Name              string `json:"name"`
+	SongCurrentSample int    `json:"songCurrentSample"`
+	SongMaxSample     int    `json:"songMaxSample"`
+	SampleRate        int    `json:"sampleRate"`
 }
 
 type VotingSong struct {
@@ -38,5 +38,5 @@ type NextSongStarted struct {
 
 type NewSongAdded struct {
 	Song *Song
-	Err error
+	Err  error
 }
