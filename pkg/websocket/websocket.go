@@ -39,15 +39,12 @@ func InitWebSocket(){
 }
 
 func createConnection(w http.ResponseWriter, r *http.Request) {
-	userAddress, _ := utils.GetIpAddress(r)
-	if _, ok := addressConnection[userAddress]; ok{
-		return
-	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Panic(err)
 		return
 	}
+	userAddress, _ := utils.GetIpAddress(r)
 	userConn := UserConnection{Conn: conn, IpAddress: userAddress}
 	addressConnection[userAddress] = userConn
 	connections = append(connections, userConn)

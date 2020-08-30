@@ -70,6 +70,10 @@ func GetIpAddress(r *http.Request) (string, error) {
 	return "", fmt.Errorf("No valid ip found")
 }
 
+func IsLocalIp(ipAddress string, localIp string) bool{
+	return ipAddress == LocalHostAddress || ipAddress == localIp
+}
+
 func TimeToMilliseconds(t time.Time) int64 {
 	return t.UnixNano() / int64(time.Millisecond)
 }
@@ -145,3 +149,17 @@ func (si ServerInformation) SaveServerInformation() {
 		log.Println(err)
 	}
 }
+
+func FormatSongName(songName string) (string, string){
+	tokens := strings.Split(songName, ".")
+	var name, format string
+	if len(tokens) > 2 {
+		name = strings.Join(tokens[:len(tokens)-1], " ")
+		format = tokens[len(tokens)-1]
+	} else {
+		name = tokens[0]
+		format = tokens[1]
+	}
+	return name, format
+}
+

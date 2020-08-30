@@ -35,21 +35,19 @@ func Recovery(next http.Handler) http.Handler {
 func HostCheck(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		defer func() {
-			serverAddress := *utils.ServerData.ServerAddress + utils.ServerPort
-			localHostAddress := utils.LocalHost + utils.LocalHost
-			if (serverAddress == r.Host || localHostAddress == r.Host) && strings.HasPrefix(r.RequestURI, "api/") {
+		serverAddress := *utils.ServerData.ServerAddress
+		userIPString, _ := utils.GetIpAddress(r)
+		if !(utils.IsLocalIp(userIPString, serverAddress) || !strings.HasPrefix(r.RequestURI, utils.ApiPrefix)) {
 
-				jsonBody, _ := json.Marshal(map[string]string{
-					"error": "You cannot access this",
+			jsonBody, _ := json.Marshal(map[string]string{
+				"error": "You cannot access this",
 				})
 
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
 				w.Write(jsonBody)
-				return
+			return
 			}
-		}()
 
 		next.ServeHTTP(w, r)
 

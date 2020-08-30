@@ -81,6 +81,7 @@ func handleRequests() {
 	utils.Router.Use(middlewares.HostCheck)
 	websocket.InitWebSocket()
 	musicController.AddRoutes()
+	utils.Router.PathPrefix("/").Handler(http.FileServer(http.Dir(".\\client")))
 	log.Fatal(http.ListenAndServe(utils.ServerPort, utils.Router))
 
 

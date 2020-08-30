@@ -2,7 +2,6 @@ package music
 
 import (
 	json2 "encoding/json"
-	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/music"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/Veljko97/jukebox_server/pkg/websocket"
@@ -13,14 +12,15 @@ import (
 )
 
 func AddRoutes(){
-	prefix := "/api/music"
-	utils.Router.HandleFunc(prefix + "/play", PlayMusic)
+	prefix := utils.ApiPrefix + "/music"
 	utils.Router.HandleFunc(prefix + "/getDetails", SongDetails)
-	utils.Router.HandleFunc(prefix + "/nextSong", NextSong)
 	utils.Router.HandleFunc(prefix + "/getSongList", GetSongsList)
 	utils.Router.HandleFunc(prefix + "/voteOnSong/{id}", VoteOnSong)
 	utils.Router.HandleFunc(prefix + "/getCurrentSong", GetCurrentSong)
-	utils.Router.HandleFunc(prefix + "/youTubeDownload", DownloadFromYouTube)
+	utils.Router.HandleFunc(utils.ApiLock + prefix + "/play", PlayMusic)
+	utils.Router.HandleFunc(utils.ApiLock + prefix + "/nextSong", NextSong)
+	utils.Router.HandleFunc(utils.ApiLock + prefix + "/youTubeDownload", DownloadFromYouTube)
+	utils.Router.HandleFunc(utils.ApiLock + prefix + "/addMusic", AddMusicFile)
 }
 
 
@@ -70,20 +70,30 @@ func GetCurrentSong(w http.ResponseWriter, r *http.Request) {
 
 func DownloadFromYouTube(w http.ResponseWriter, r *http.Request) {
 	bytes, _ := ioutil.ReadAll(r.Body)
-	songUrl := string(bytes)
+	var songUrls map[string][]string
+	json2.Unmarshal(bytes, &songUrls)
 
-	newSongChan := make(chan music.NewSongAdded)
-
-	go music.DownloadYoutubeSong(songUrl, newSongChan)
-
-	newSong := <- newSongChan
-	if newSong.Err != nil {
-		fmt.Println(newSong.Err)
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(""))
-		return
+	for _, songUrl := range songUrls["links"] {
+		music.SongUploadWaitGroup.Add(1)
+		go music.DownloadYoutubeSong(songUrl)
 	}
+	music.SongUploadWaitGroup.Wait()
 
-	json, _ := json2.Marshal(newSong.Song)
-	w.Write(json)
+
+	music.SongUploadWaitGroup.Add(1)
+	w.Write([]byte("song uploaded"))
+}
+
+
+func AddMusicFile(w http.ResponseWriter, r *http.Request) {
+	bytes, _ := ioutil.ReadAll(r.Body)
+	var files map[string][]string
+	json2.Unmarshal(bytes, &files)
+
+	for _, fileLocation := range files["files"] {
+		music.SongUploadWaitGroup.Add(1)
+		go music.AddSongFile(fileLocation)
+	}
+	music.SongUploadWaitGroup.Wait()
+	w.Write([]byte("song uploaded"))
 }

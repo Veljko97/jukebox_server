@@ -6,13 +6,17 @@ import (
 )
 
 const LocalHost = "localhost"
+const LocalHostAddress = "::1"
 const ServerPort = ":8080"
+
+const ApiPrefix = "/api"
+const ApiLock = "/lock"
 
 const NumberOfSongs = 1
 
 const MusicDirectory = "." + string(os.PathSeparator) + "local_jukebox_music"
-const MainMusicDir = string(os.PathSeparator) + "main"
-const TempMusicDir = string(os.PathSeparator) + "temp"
+const MainMusicDir = MusicDirectory + string(os.PathSeparator) + "main"
+const TempMusicDir = MusicDirectory + string(os.PathSeparator) + "temp"
 
 const DataDirectory = "." + string(os.PathSeparator) + "data"
 const DataFile = DataDirectory + string(os.PathSeparator) + "data.json"

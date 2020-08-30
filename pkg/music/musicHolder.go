@@ -30,7 +30,6 @@ var songDone = make(chan bool)
 var currentSong PlayingSong
 
 var NewSongStarted = make(chan NextSongStarted)
-var NewSongStartedLocal = make(chan NextSongStarted)
 
 var songIdMux = sync.Mutex{}
 var LastSongId = 0
@@ -45,15 +44,15 @@ func LoadMusicFiles() {
 		}
 	}
 
-	if _, err := os.Stat(utils.MusicDirectory + utils.MainMusicDir); os.IsNotExist(err) {
-		err := os.MkdirAll(utils.MusicDirectory+utils.MainMusicDir, os.ModePerm)
+	if _, err := os.Stat(utils.MainMusicDir); os.IsNotExist(err) {
+		err := os.MkdirAll(utils.MainMusicDir, os.ModePerm)
 		if err != nil {
 			log.Println(err)
 		}
 	}
 
-	if _, err := os.Stat(utils.MusicDirectory + utils.TempMusicDir); os.IsNotExist(err) {
-		err := os.MkdirAll(utils.MusicDirectory+utils.TempMusicDir, os.ModePerm)
+	if _, err := os.Stat(utils.TempMusicDir); os.IsNotExist(err) {
+		err := os.MkdirAll(utils.TempMusicDir, os.ModePerm)
 		if err != nil {
 			log.Println(err)
 		}
@@ -66,16 +65,13 @@ func LoadMusicFiles() {
 		if !info.IsDir() {
 			LastSongId++
 			song := Song{id: LastSongId, Location: path}
-			tokens := strings.Split(info.Name(), ".")
-			if len(tokens) > 2 {
-				song.Name = strings.Join(tokens[:len(tokens)-1], " ")
-				song.AudioFileType = tokens[len(tokens)-1]
-			} else {
-				song.Name = tokens[0]
-				song.AudioFileType = tokens[1]
-			}
-			AllSongs = append(AllSongs, &song)
 
+			if songName, songType := utils.FormatSongName(info.Name()); strings.ToUpper(songType) == "MP3" {
+				song.Name = songName
+				song.AudioFileType = songType
+
+				AllSongs = append(AllSongs, &song)
+			}
 		}
 
 		return nil
@@ -171,7 +167,6 @@ func PlaySong(song *Song) {
 		VotingList: GetVotingList(),
 	}
 	NewSongStarted <- newSong
-	NewSongStartedLocal <- newSong
 	for {
 		select {
 		case <-songDone:
