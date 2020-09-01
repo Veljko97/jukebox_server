@@ -46,8 +46,17 @@ func createConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	userAddress, _ := utils.GetIpAddress(r)
 	userConn := UserConnection{Conn: conn, IpAddress: userAddress}
+	if oldConnection,ok :=  addressConnection[userAddress]; ok {
+		for i, _ := range connections {
+			if connections[i] == oldConnection {
+				connections[i] = userConn
+				break
+			}
+		}
+	}else {
+		connections = append(connections, userConn)
+	}
 	addressConnection[userAddress] = userConn
-	connections = append(connections, userConn)
 }
 
 func SendMessageToAll(message string) {

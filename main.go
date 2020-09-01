@@ -9,6 +9,7 @@ import (
 	"github.com/Veljko97/jukebox_server/pkg/music"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/Veljko97/jukebox_server/pkg/websocket"
+	"github.com/Veljko97/jukebox_server/src/gui"
 	musicController "github.com/Veljko97/jukebox_server/src/music"
 	"log"
 	"math/rand"
@@ -74,6 +75,7 @@ func initServerData() {
 	}
 }
 
+
 func handleRequests() {
 	initServerData()
 	utils.Router.HandleFunc("/api/getServerTime", getServerTime)
@@ -81,7 +83,11 @@ func handleRequests() {
 	utils.Router.Use(middlewares.HostCheck)
 	websocket.InitWebSocket()
 	musicController.AddRoutes()
-	utils.Router.PathPrefix("/").Handler(http.FileServer(http.Dir(".\\client")))
+
+	//must be last
+	gui.AddRoutes()
+
+	go utils.OpenLink("http://localhost" + utils.ServerPort)
 	log.Fatal(http.ListenAndServe(utils.ServerPort, utils.Router))
 
 

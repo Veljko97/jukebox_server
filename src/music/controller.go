@@ -2,6 +2,7 @@ package music
 
 import (
 	json2 "encoding/json"
+	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/music"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/Veljko97/jukebox_server/pkg/websocket"
@@ -12,15 +13,17 @@ import (
 )
 
 func AddRoutes(){
-	prefix := utils.ApiPrefix + "/music"
+	musicPrefix := "/music"
+	prefix := utils.ApiPrefix + musicPrefix
+	lockedPrefix :=  utils.ApiPrefix + utils.ApiLock + musicPrefix
 	utils.Router.HandleFunc(prefix + "/getDetails", SongDetails)
 	utils.Router.HandleFunc(prefix + "/getSongList", GetSongsList)
 	utils.Router.HandleFunc(prefix + "/voteOnSong/{id}", VoteOnSong)
 	utils.Router.HandleFunc(prefix + "/getCurrentSong", GetCurrentSong)
-	utils.Router.HandleFunc(utils.ApiLock + prefix + "/play", PlayMusic)
-	utils.Router.HandleFunc(utils.ApiLock + prefix + "/nextSong", NextSong)
-	utils.Router.HandleFunc(utils.ApiLock + prefix + "/youTubeDownload", DownloadFromYouTube)
-	utils.Router.HandleFunc(utils.ApiLock + prefix + "/addMusic", AddMusicFile)
+	utils.Router.HandleFunc(lockedPrefix + "/playStop", PlayMusic)
+	utils.Router.HandleFunc(lockedPrefix + "/nextSong", NextSong).Methods(http.MethodPut)
+	utils.Router.HandleFunc(lockedPrefix + "/youTubeDownload", DownloadFromYouTube).Methods(http.MethodPost)
+	utils.Router.HandleFunc(lockedPrefix + "/addMusic", AddMusicFile).Methods(http.MethodPost)
 }
 
 
@@ -36,7 +39,7 @@ func SongDetails(w http.ResponseWriter, r *http.Request) {
 
 func NextSong(w http.ResponseWriter, r *http.Request) {
 	music.NextSong()
-	w.WriteHeader(http.StatusInternalServerError)
+	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(""))
 }
 
@@ -79,21 +82,28 @@ func DownloadFromYouTube(w http.ResponseWriter, r *http.Request) {
 	}
 	music.SongUploadWaitGroup.Wait()
 
-
-	music.SongUploadWaitGroup.Add(1)
-	w.Write([]byte("song uploaded"))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
 }
 
 
 func AddMusicFile(w http.ResponseWriter, r *http.Request) {
-	bytes, _ := ioutil.ReadAll(r.Body)
-	var files map[string][]string
-	json2.Unmarshal(bytes, &files)
+	err := r.ParseMultipartForm(200000) // grab the multipart form
+	if err != nil {
+		fmt.Fprintln(w, err)
+		return
+	}
 
-	for _, fileLocation := range files["files"] {
+	formdata := r.MultipartForm // ok, no problem so far, read the Form data
+
+	//get the *fileheaders
+	files := formdata.File["songs"] // grab the filenames
+
+	for _, fileHarder := range files{
 		music.SongUploadWaitGroup.Add(1)
-		go music.AddSongFile(fileLocation)
+		go music.AddSongFile(fileHarder)
 	}
 	music.SongUploadWaitGroup.Wait()
-	w.Write([]byte("song uploaded"))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
 }

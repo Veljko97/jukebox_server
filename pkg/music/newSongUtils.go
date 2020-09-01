@@ -6,6 +6,8 @@ import (
 	"github.com/kkdai/youtube"
 	"github.com/xfrr/goffmpeg/ffmpeg"
 	"github.com/xfrr/goffmpeg/transcoder"
+	"io"
+	"mime/multipart"
 	"os"
 	"strings"
 	"sync"
@@ -14,6 +16,7 @@ import (
 var SongUploadWaitGroup sync.WaitGroup
 
 func DownloadYoutubeSong(songURL string) {
+	defer SongUploadWaitGroup.Done()
 	client := youtube.NewYoutube(false, false)
 	client.DecodeURL(songURL)
 
@@ -60,12 +63,24 @@ func convertMp4ToMp3(fileLocation string) string {
 	return fileLocation + "." + utils.Mp3Extension
 }
 
-func AddSongFile(fileLocation string){
-	tokens := strings.Split(fileLocation, string(os.PathSeparator))
+func AddSongFile(fileHeader *multipart.FileHeader){
+	defer SongUploadWaitGroup.Done()
+	tokens := strings.Split(fileHeader.Filename, string(os.PathSeparator))
 	filename := tokens[len(tokens) - 1]
 	newFileLocation := utils.MainMusicDir + string(os.PathSeparator) + filename
 	if songName, songType := utils.FormatSongName(filename); strings.ToLower(songType) == utils.Mp3Extension {
-		os.Link(fileLocation, newFileLocation)
+		file, _ := fileHeader.Open()
+		defer file.Close()
+		out, _ := os.Create(utils.MainMusicDir + string(os.PathSeparator) + filename)
+		defer out.Close()
+
+		_, err := io.Copy(out, file)
+
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
 		newSong := NewSongAdded{
 			Song: &Song{
 				id:            -1,
@@ -77,5 +92,4 @@ func AddSongFile(fileLocation string){
 		}
 		NewSongChan <- newSong
 	}
-	SongUploadWaitGroup.Done()
 }

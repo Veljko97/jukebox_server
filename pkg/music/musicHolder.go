@@ -82,6 +82,19 @@ func LoadMusicFiles() {
 	go waitForNewSong()
 }
 
+func RemoveSong(values []*Song, song *Song) []*Song {
+	var index int
+
+	for i, value := range values {
+		if value == song {
+			index = i
+			break
+		}
+	}
+
+	return append(values[:index], values[index+1:]...)
+}
+
 func waitForNewSong(){
 	for {
 		newSong := <- NewSongChan
@@ -138,7 +151,10 @@ func StartNextSong() {
 func PlaySong(song *Song) {
 	f, err := os.Open(song.Location)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		StartNextSong()
+		AllSongs = RemoveSong(AllSongs, song)
+		return
 	}
 
 	defer f.Close()

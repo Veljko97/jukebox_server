@@ -37,7 +37,7 @@ func HostCheck(next http.Handler) http.Handler {
 
 		serverAddress := *utils.ServerData.ServerAddress
 		userIPString, _ := utils.GetIpAddress(r)
-		if !(utils.IsLocalIp(userIPString, serverAddress) || !strings.HasPrefix(r.RequestURI, utils.ApiPrefix)) {
+		if !(utils.IsLocalIp(userIPString, serverAddress) || !strings.Contains(r.RequestURI, utils.ApiLock)) {
 
 			jsonBody, _ := json.Marshal(map[string]string{
 				"error": "You cannot access this",
