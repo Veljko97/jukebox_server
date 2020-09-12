@@ -9,10 +9,13 @@ const LocalHost = "localhost"
 const LocalHostAddress = "::1"
 const ServerPort = ":8080"
 
+const AppPrefix = "jukebox:///"
+
 const ApiPrefix = "/api"
 const ApiLock = "/lock"
 
-const NumberOfSongs = 1
+const NumberOfSongs = 5
+const NumberOfTempSongs = 2
 
 const MusicDirectory = "." + string(os.PathSeparator) + "local_jukebox_music"
 const MainMusicDir = MusicDirectory + string(os.PathSeparator) + "main"

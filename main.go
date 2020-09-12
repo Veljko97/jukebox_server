@@ -78,7 +78,7 @@ func initServerData() {
 
 func handleRequests() {
 	initServerData()
-	utils.Router.HandleFunc("/api/getServerTime", getServerTime)
+	utils.Router.HandleFunc(utils.ApiPrefix + "/getServerTime", getServerTime)
 	utils.Router.Use(middlewares.Recovery)
 	utils.Router.Use(middlewares.HostCheck)
 	websocket.InitWebSocket()
@@ -95,6 +95,7 @@ func handleRequests() {
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
+	music.RemoveTempSongs()
 	music.LoadMusicFiles()
 	music.StartNextSong()
 	handleRequests()

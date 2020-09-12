@@ -36,6 +36,7 @@ func InitWebSocket(){
 
 	utils.Router.HandleFunc("/ws/music", createConnection)
 	go nextSongSending()
+	go sendSongTimeUpdate()
 }
 
 func createConnection(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +47,7 @@ func createConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	userAddress, _ := utils.GetIpAddress(r)
 	userConn := UserConnection{Conn: conn, IpAddress: userAddress}
-	if oldConnection,ok :=  addressConnection[userAddress]; ok {
+	if oldConnection, ok :=  addressConnection[userAddress]; ok {
 		for i, _ := range connections {
 			if connections[i] == oldConnection {
 				connections[i] = userConn
@@ -96,5 +97,12 @@ func nextSongSending(){
 	for {
 		songDescription := <- music.NewSongStarted
 		SendObjectToAll(songDescription)
+	}
+}
+
+func sendSongTimeUpdate(){
+	for {
+		songTimeUpdate := <- music.SongTimeUpdate;
+		SendObjectToAll(songTimeUpdate)
 	}
 }

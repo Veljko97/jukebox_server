@@ -3,10 +3,10 @@ package music
 import "github.com/faiface/beep"
 
 type Song struct {
-	id            int
-	Location      string
-	Name          string
-	AudioFileType string
+	id            int    `json:"id"`
+	Location      string `json:"-"`
+	Name          string `json:"name"`
+	AudioFileType string `json:"-"`
 }
 
 type PlayingSong struct {
@@ -36,7 +36,16 @@ type NextSongStarted struct {
 	VotingList []VotingSong    `json:"votingList"`
 }
 
-type NewSongAdded struct {
-	Song *Song
-	Err  error
+type SongError struct {
+	SongName string
+	Err      error
+}
+
+type NewTempSong struct {
+	UserAddress string
+	Song        *Song
+}
+
+type SendSongsModel struct {
+	Songs []*Song `json:"songs"`
 }

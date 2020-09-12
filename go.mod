@@ -13,7 +13,7 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.0 // indirect
 	github.com/hajimehoshi/oto v0.6.3 // indirect
 	github.com/kkdai/youtube v1.2.4
-	github.com/kkdai/youtube/v2 v2.0.2 // indirect
+	github.com/kkdai/youtube/v2 v2.0.2
 	github.com/lxn/win v0.0.0-20191128105842-2da648fda5b4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/vbauerster/mpb/v5 v5.3.0 // indirect

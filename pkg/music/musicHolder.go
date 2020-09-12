@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/Veljko97/jukebox_server/pkg/utils"
 	"github.com/faiface/beep"
-	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/mp3"
 	"github.com/faiface/beep/speaker"
 	"log"
@@ -20,7 +19,7 @@ import (
 
 var AllSongs []*Song
 
-var TempSong []*Song
+var TempSongs = make(map[string]*Song)
 
 var songVotesLock sync.Mutex
 var SongVotes = make(map[*Song][]string)
@@ -30,11 +29,14 @@ var songDone = make(chan bool)
 var currentSong PlayingSong
 
 var NewSongStarted = make(chan NextSongStarted)
+var SongTimeUpdate = make(chan SongDescription)
 
 var songIdMux = sync.Mutex{}
 var LastSongId = 0
 
-var NewSongChan = make(chan NewSongAdded)
+var NewSongChan = make(chan *Song)
+
+var NewTempSongChan = make(chan *NewTempSong)
 
 func LoadMusicFiles() {
 	if _, err := os.Stat(utils.MusicDirectory); os.IsNotExist(err) {
@@ -58,7 +60,7 @@ func LoadMusicFiles() {
 		}
 	}
 	LastSongId = 0
-	err := filepath.Walk(utils.MusicDirectory, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(utils.MainMusicDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -82,6 +84,27 @@ func LoadMusicFiles() {
 	go waitForNewSong()
 }
 
+// https://stackoverflow.com/a/33451503
+func RemoveTempSongs() error {
+	dir := utils.TempMusicDir
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	names, err := d.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+	for _, name := range names {
+		err = os.RemoveAll(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func RemoveSong(values []*Song, song *Song) []*Song {
 	var index int
 
@@ -97,24 +120,38 @@ func RemoveSong(values []*Song, song *Song) []*Song {
 
 func waitForNewSong(){
 	for {
-		newSong := <- NewSongChan
-		if newSong.Err != nil {
-			fmt.Println(newSong.Err)
-			continue
+
+		select {
+		case newSong := <- NewSongChan:
+			songIdMux.Lock()
+			LastSongId ++
+			newSong.id = LastSongId
+			AllSongs = append(AllSongs, newSong)
+			songIdMux.Unlock()
+		case newTempSong := <- NewTempSongChan:
+			songIdMux.Lock()
+			LastSongId ++
+			newTempSong.Song.id = LastSongId
+			TempSongs[newTempSong.UserAddress] = newTempSong.Song
+			songIdMux.Unlock()
 		}
-		songIdMux.Lock()
-		LastSongId ++
-		newSong.Song.id = LastSongId
-		AllSongs = append(AllSongs, newSong.Song)
-		songIdMux.Unlock()
 	}
 }
 
 func prepareNextSet(lastSong *Song) {
-	for i := 0; i < utils.NumberOfSongs; {
+	isLimitMoved := false
+	numberOfSongs := utils.NumberOfSongs
+	if utils.NumberOfSongs >= len(AllSongs){
+		isLimitMoved = true
+		numberOfSongs = len(AllSongs)
+	}
+	for i := 0; i < numberOfSongs; i++ {
 		randSong := randomSong()
 		if lastSong != nil {
 			if randSong.id == lastSong.id {
+				if isLimitMoved {
+					numberOfSongs --
+				}
 				continue
 			}
 		}
@@ -122,12 +159,49 @@ func prepareNextSet(lastSong *Song) {
 			continue
 		}
 		SongVotes[randSong] = make([]string, 0)
-		i++
+	}
+
+	isLimitMoved = false
+	numberOfSongs = utils.NumberOfTempSongs
+	if utils.NumberOfTempSongs > len(TempSongs){
+		isLimitMoved = true
+		numberOfSongs = len(TempSongs)
+	}
+	for i := 0; i < numberOfSongs; i++ {
+		randSong := randomTempSong()
+		if lastSong != nil {
+			if randSong.id == lastSong.id {
+				if isLimitMoved {
+					numberOfSongs --
+				}
+				continue
+			}
+		}
+		if _, ok := SongVotes[randSong]; ok {
+			continue
+		}
+		SongVotes[randSong] = make([]string, 0)
 	}
 }
 
 func randomSong() *Song {
 	return AllSongs[rand.Intn(len(AllSongs))]
+}
+
+func randomTempSong() *Song{
+	tempSongs := GetTempSongList()
+	return tempSongs[rand.Intn(len(tempSongs))]
+}
+
+
+func GetTempSongList() []*Song{
+	values := make([]*Song, len(TempSongs))
+	i := 0
+	for k := range TempSongs {
+		values[i] = TempSongs[k]
+		i++
+	}
+	return values
 }
 
 func StartNextSong() {
@@ -170,14 +244,14 @@ func PlaySong(song *Song) {
 	ctrl := &beep.Ctrl{Paused: false, Streamer: beep.Seq(audioStream, beep.Callback(func() {
 		songDone <- true
 	}))}
-	volume := &effects.Volume{
-		Streamer: ctrl,
-		Base:     2,
-		Volume:   0,
-		Silent:   true,
-	}
+	//volume := &effects.Volume{
+	//	Streamer: ctrl,
+	//	Base:     2,
+	//	Volume:   0,
+	//	Silent:   true,
+	//}
 	currentSong = PlayingSong{AudioStream: audioStream, AudioFormat: audioFormat, AudioControl: ctrl, SongDetails: song}
-	speaker.Play(volume)
+	speaker.Play(ctrl)
 	newSong := NextSongStarted{
 		NextSong:   GetSongData(),
 		VotingList: GetVotingList(),
@@ -190,9 +264,9 @@ func PlaySong(song *Song) {
 			StartNextSong()
 			return
 		case <-time.After(time.Second):
-			speaker.Lock()
 			fmt.Println(audioFormat.SampleRate.D(audioStream.Position()).Round(time.Second))
-			speaker.Unlock()
+		case <- time.After(time.Minute):
+			GetSongData()
 		}
 	}
 	//if <-songDone {
@@ -233,7 +307,7 @@ func NextSong() {
 }
 
 func GetVotingList() []VotingSong {
-	songs := make([]VotingSong, utils.NumberOfSongs)
+	songs := make([]VotingSong, len(SongVotes))
 	i := 0
 	for song, votes := range SongVotes {
 		songVotes := VotingSong{
@@ -271,6 +345,7 @@ func VoteOnSong(userAddress string, songId int) []VotingSong {
 	return GetVotingList()
 }
 
+
 func RemoveVote(userAddress string) {
 	songVotesLock.Lock()
 	defer songVotesLock.Unlock()
@@ -278,8 +353,13 @@ func RemoveVote(userAddress string) {
 		for index, user := range votes {
 			if user == userAddress {
 				votes = utils.RemoveString(votes, index)
+				delete(TempSongs, userAddress)
 				return
 			}
 		}
 	}
+}
+
+func GetAllSongs() []*Song{
+	return AllSongs
 }
