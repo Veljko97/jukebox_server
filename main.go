@@ -97,6 +97,6 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	music.RemoveTempSongs()
 	music.LoadMusicFiles()
-	music.StartNextSong()
+	//music.StartNextSong()
 	handleRequests()
 }

@@ -102,7 +102,7 @@ func nextSongSending(){
 
 func sendSongTimeUpdate(){
 	for {
-		songTimeUpdate := <- music.SongTimeUpdate;
+		songTimeUpdate := <- music.SongTimeUpdate
 		SendObjectToAll(songTimeUpdate)
 	}
 }

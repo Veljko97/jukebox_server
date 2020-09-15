@@ -24,8 +24,8 @@ const TempMusicDir = MusicDirectory + string(os.PathSeparator) + "temp"
 const DataDirectory = "." + string(os.PathSeparator) + "data"
 const DataFile = DataDirectory + string(os.PathSeparator) + "data.json"
 
-const RecordServerAddress = "http://localhost:5001/local-jubox/us-central1/addServer" //Testing
-//const RecordServerAddress ="https://us-central1-local-jubox.cloudfunctions.net/addServer" //Production
+//const RecordServerAddress = "http://localhost:5001/local-jubox/us-central1/addServer" //Testing
+const RecordServerAddress ="https://us-central1-local-jubox.cloudfunctions.net/addServer" //Production
 
 const LocalKeyLength = 6
 
